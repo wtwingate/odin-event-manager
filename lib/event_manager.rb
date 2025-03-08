@@ -5,8 +5,37 @@ require 'erb'
 
 require 'google/apis/civicinfo_v2'
 
-def clean_zipcode(zipcode)
-  zipcode.to_s.rjust(5, '0')[0..4]
+def clean_zip_code(zip_code)
+  zip_code.to_s.rjust(5, '0')[0..4]
+end
+
+def clean_phone_number(phone_number)
+  digits = phone_number.scan(/\d/)
+
+  return '' unless digits.length.between?(10, 11)
+  return '' unless digits.length == 10 || digits.first == '1'
+
+  digits.last(10).join
+end
+
+def target_time_of_day(data)
+  times = data.map do |row|
+    Time.strptime(row[:regdate], '%m/%d/%y %k:%M')
+  end
+
+  times.each_with_object(Hash.new(0)) do |time, counts|
+    counts[time.hour] += 1
+  end
+end
+
+def target_day_of_week(data)
+  times = data.map do |row|
+    Time.strptime(row[:regdate], '%m/%d/%y %k:%M')
+  end
+
+  times.each_with_object(Hash.new(0)) do |time, counts|
+    counts[time.wday] += 1
+  end
 end
 
 def legislators_by_zipcode(zipcode)
@@ -38,7 +67,7 @@ exit unless File.exist? 'event_attendees.csv'
 
 puts 'Event Manager Initialized!'
 
-contents = CSV.open(
+data = CSV.open(
   'event_attendees.csv',
   headers: true,
   header_converters: :symbol
@@ -47,11 +76,11 @@ contents = CSV.open(
 template_letter = File.read('form_letter.html.erb')
 erb_template = ERB.new template_letter
 
-contents.each do |row|
+data.each do |row|
   id = row[0]
   name = row[:first_name]
-  zipcode = clean_zipcode(row[:zipcode])
-  legislators = legislators_by_zipcode(zipcode)
+  zip_code = clean_zip_code(row[:zipcode])
+  legislators = legislators_by_zipcode(zip_code)
 
   form_letter = erb_template.result(binding)
 
